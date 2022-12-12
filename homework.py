@@ -33,9 +33,7 @@ my_homeworks = {}
 
 def check_tokens():
     """Проверка наличия к окружении токенов и номера чата."""
-    if not all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
-        logging.critical('Отсутствует обязательная переменная окружения')
-        sys.exit('Программа принудительно остановлена.')
+    return all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID])
 
 
 def send_message(bot, message):
@@ -72,36 +70,30 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Проверка ответа API на соответствие документации."""
-    if 'homeworks' in response:
-        homeworks = response['homeworks']
-    else:
+    if 'homeworks' not in response:
         raise TypeError('В ответе API отсутствует ключ <homeworks>')
-
-    if not isinstance(homeworks, list):
+    if not isinstance(response['homeworks'], list):
         raise TypeError('Неожиданная структура данных о домашке в ответе API')
-    else:
-        return homeworks
+    return response['homeworks']
 
 
 def parse_status(homework):
     """Извлечение статуса домашней работы."""
-    if 'homework_name' in homework and 'status' in homework:
-        homework_name = homework['homework_name']
-        status = homework['status']
-    else:
+    if 'homework_name' not in homework or 'status' not in homework:
         raise KeyError('В ответе API домашки нет нужного ключа name/status')
 
+    homework_name = homework['homework_name']
+    status = homework['status']
     if homework_name in my_homeworks and my_homeworks[homework_name] == status:
         logging.debug('Новый статус проверки не появился')
     else:
         my_homeworks[homework_name] = status
         if status not in HOMEWORK_VERDICTS:
             raise KeyError('Статус домашки в ответе API отсутвует в словаре')
-        else:
-            verdict = HOMEWORK_VERDICTS[status]
-            logging.info('Изменился статус проверки работы')
-            return (f'Изменился статус проверки работы "{homework_name}". '
-                    f'{verdict}')
+        verdict = HOMEWORK_VERDICTS[status]
+        logging.info('Изменился статус проверки работы')
+        return (f'Изменился статус проверки работы "{homework_name}". '
+                f'{verdict}')
 
 
 def main():
@@ -113,20 +105,21 @@ def main():
     handler = logging.StreamHandler(stream=sys.stdout)
     logger.addHandler(handler)
 
-    check_tokens()
+    if not check_tokens():
+        logging.critical('Отсутствует обязательная переменная окружения')
+        sys.exit('Программа принудительно остановлена.')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     while True:
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            if homeworks == []:
+            if not homeworks:
                 logging.debug('Новый статус проверки не появился')
             else:
                 message = parse_status(homeworks[0])
                 if message:
                     send_message(bot, message)
-
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
