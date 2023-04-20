@@ -6,9 +6,9 @@
 ```
 
 ### Технологии:
-- Python 3.9
-- python-dotenv 0.19.0
-- python-telegram-bot 13.7
+- Python
+- python-dotenv
+- python-telegram-bot
 
 ### Как запустить проект:
 
